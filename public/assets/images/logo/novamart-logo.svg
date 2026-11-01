@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 240 60" fill="none">
+  <rect width="48" height="48" rx="14" y="6" fill="url(#logo_grad)"/>
+  <path d="M16 22L24 16L32 22V38L24 44L16 38V22Z" stroke="white" stroke-width="2.5" stroke-linejoin="round"/>
+  <circle cx="24" cy="30" r="4" fill="#C7D2FE"/>
+  <text x="60" y="38" font-family="system-ui, -apple-system, BlinkMacSystemFont, sans-serif" font-weight="900" font-size="24" fill="#0F172A" letter-spacing="-0.5">NOVAMART</text>
+  <defs>
+    <linearGradient id="logo_grad" x1="0" y1="6" x2="48" y2="54" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#4F46E5"/>
+      <stop offset="0.5" stop-color="#4338CA"/>
+      <stop offset="1" stop-color="#7E22CE"/>
+    </linearGradient>
+  </defs>
+</svg>
