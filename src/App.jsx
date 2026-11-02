@@ -26,7 +26,7 @@ import { ShieldAlert, Store, ArrowRight } from 'lucide-react';
 
 function AppContent() {
   const { activeView, setActiveView, viewportMode } = useStore();
-  const { isAuthenticated, isSeller, openAuthModal } = useAuth();
+  const { user, isAuthenticated, isSeller, openAuthModal } = useAuth();
 
   // Viewport simulator dimensions
   const viewportWidthStyles = {
