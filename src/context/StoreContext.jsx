@@ -1,6 +1,7 @@
 import React, { createContext, useState, useEffect } from 'react';
 import { initialProducts } from '../data/products';
 import { initialSellerStats, initialOrders } from '../data/mockSeller';
+import { productApi, wishlistApi } from '../services/api';
 
 export const StoreContext = createContext(null);
 
@@ -68,6 +69,9 @@ export function StoreProvider({ children }) {
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
   const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
   const [isImageAuditOpen, setIsImageAuditOpen] = useState(false);
+  const [isWishlistOpen, setIsWishlistOpen] = useState(false);
+  const [isProfileOpen, setIsProfileOpen] = useState(false);
+  const [isAdminModalOpen, setIsAdminModalOpen] = useState(false);
 
   // Responsive Viewport Simulation Mode: 'responsive' | 'mobile' (375px) | 'tablet' (768px) | 'laptop' (1024px) | 'desktop' (1440px)
   const [viewportMode, setViewportMode] = useState('responsive');
@@ -91,6 +95,20 @@ export function StoreProvider({ children }) {
   useEffect(() => {
     localStorage.setItem('novamart_wishlist', JSON.stringify(wishlist));
   }, [wishlist]);
+
+  // Synchronize Wishlist with backend when user is authenticated
+  useEffect(() => {
+    if (localStorage.getItem('novamart_token')) {
+      wishlistApi.getWishlist()
+        .then((res) => {
+          if (res?.data?.products && Array.isArray(res.data.products)) {
+            const ids = res.data.products.map((p) => p._id || p.id);
+            setWishlist(ids);
+          }
+        })
+        .catch(() => {});
+    }
+  }, []);
 
   // Toast helper
   const addToast = (message, type = 'success', duration = 3000) => {
@@ -150,30 +168,70 @@ export function StoreProvider({ children }) {
   };
 
   // Wishlist actions
-  const toggleWishlist = (product) => {
+  const toggleWishlist = async (product) => {
+    const targetId = product.id || product._id;
+    const isFavorited = wishlist.includes(targetId);
+
     setWishlist((prev) => {
-      const isFavorited = prev.includes(product.id);
       if (isFavorited) {
         addToast(`Removed from wishlist`, 'info');
-        return prev.filter((id) => id !== product.id);
+        return prev.filter((id) => id !== targetId);
       } else {
         addToast(`Saved to wishlist`, 'success');
-        return [...prev, product.id];
+        return [...prev, targetId];
       }
     });
+
+    if (localStorage.getItem('novamart_token')) {
+      try {
+        if (isFavorited) {
+          await wishlistApi.removeFromWishlist(targetId);
+        } else {
+          await wishlistApi.addToWishlist(targetId);
+        }
+      } catch (err) {
+        console.warn('Backend wishlist sync:', err.message);
+      }
+    }
   };
 
-  // Seller: Add or update product
-  const saveProduct = (newProductData, isEditing = false) => {
+  const clearWishlist = async () => {
+    setWishlist([]);
+    if (localStorage.getItem('novamart_token')) {
+      try {
+        await wishlistApi.clearWishlist();
+      } catch (err) {
+        console.warn('Backend clear wishlist sync:', err.message);
+      }
+    }
+    addToast('Wishlist cleared', 'info');
+  };
+
+  // Seller: Add or update product with REST API synchronization
+  const saveProduct = async (newProductData, isEditing = false) => {
     if (isEditing) {
       setProducts((prev) =>
         prev.map((p) => (p.id === newProductData.id ? { ...p, ...newProductData } : p))
       );
+      try {
+        await productApi.updateProduct(newProductData.id, newProductData);
+      } catch {
+        // Fallback to local storage persistence
+      }
       addToast('Product details updated successfully!', 'success');
     } else {
+      let createdId = `prod-${Date.now()}`;
+      try {
+        const res = await productApi.createProduct(newProductData);
+        if (res && res.data) {
+          createdId = res.data.id || res.data._id || createdId;
+        }
+      } catch {
+        // Fallback to local storage persistence
+      }
       const newProduct = {
         ...newProductData,
-        id: `prod-${Date.now()}`,
+        id: createdId,
         rating: 5.0,
         reviewCount: 1,
         inStock: true
@@ -187,8 +245,13 @@ export function StoreProvider({ children }) {
     }
   };
 
-  const deleteProduct = (productId) => {
+  const deleteProduct = async (productId) => {
     setProducts((prev) => prev.filter((p) => p.id !== productId));
+    try {
+      await productApi.deleteProduct(productId);
+    } catch {
+      // Fallback to local storage persistence
+    }
     setSellerStats((prev) => ({
       ...prev,
       activeProducts: Math.max(0, prev.activeProducts - 1)
@@ -243,6 +306,13 @@ export function StoreProvider({ children }) {
         setIsCheckoutOpen,
         isImageAuditOpen,
         setIsImageAuditOpen,
+        isWishlistOpen,
+        setIsWishlistOpen,
+        isProfileOpen,
+        setIsProfileOpen,
+        isAdminModalOpen,
+        setIsAdminModalOpen,
+        clearWishlist,
         viewportMode,
         setViewportMode,
         sellerStats,

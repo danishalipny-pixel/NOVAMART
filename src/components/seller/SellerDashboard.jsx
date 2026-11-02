@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useStore } from '../../context/StoreContext';
+import { sellerApi } from '../../services/api';
 import SafeImage from '../common/SafeImage';
 import ProductUploadModal from './ProductUploadModal';
 import { salesChartData } from '../../data/mockSeller';
@@ -14,23 +15,76 @@ import {
   Trash2,
   Search,
   ArrowUpRight,
-  Eye
+  Eye,
+  Check,
+  X
 } from 'lucide-react';
 
 export default function SellerDashboard() {
   const {
     products,
     deleteProduct,
+    saveProduct,
     sellerStats,
     sellerOrders,
     setActiveView,
-    setSelectedProductForDetail
+    setSelectedProductForDetail,
+    addToast
   } = useStore();
 
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
   const [productSearch, setProductSearch] = useState('');
   const [activeTab, setActiveTab] = useState('inventory'); // 'inventory' | 'orders'
+  const [liveMetrics, setLiveMetrics] = useState(null);
+  const [stockEditingId, setStockEditingId] = useState(null);
+  const [stockInputVal, setStockInputVal] = useState('');
+
+  // Fetch real-time backend dashboard stats when available
+  useEffect(() => {
+    let isMounted = true;
+    sellerApi
+      .getDashboard()
+      .then((res) => {
+        if (isMounted && res?.data?.metrics) {
+          setLiveMetrics(res.data.metrics);
+        }
+      })
+      .catch(() => {
+        // Fall back gracefully to mock / context stats
+      });
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const displayStats = {
+    totalRevenue: liveMetrics?.totalRevenue ?? sellerStats.totalRevenue,
+    totalOrders: liveMetrics?.orderCount ?? sellerStats.totalOrders,
+    activeListings: liveMetrics?.activeProducts ?? products.length,
+    averageRating: sellerStats.averageRating,
+    monthlyGrowth: sellerStats.monthlyGrowth,
+    orderGrowth: sellerStats.orderGrowth
+  };
+
+  const handleStockSave = async (product) => {
+    const numeric = parseInt(stockInputVal, 10);
+    if (isNaN(numeric) || numeric < 0) {
+      addToast('Stock count must be a non-negative number', 'error');
+      return;
+    }
+    try {
+      await sellerApi.updateStock(product._id || product.id, numeric);
+      saveProduct({ ...product, stock: numeric }, true);
+      addToast(`Stock for "${product.name}" updated to ${numeric}`, 'success');
+    } catch {
+      saveProduct({ ...product, stock: numeric }, true);
+      addToast(`Stock updated to ${numeric}`, 'info');
+    } finally {
+      setStockEditingId(null);
+      setStockInputVal('');
+    }
+  };
 
   // Filter seller products
   const sellerProducts = products.filter((p) => {
@@ -92,10 +146,10 @@ export default function SellerDashboard() {
           <div>
             <span className="text-xs font-semibold text-slate-400 block">Total Revenue</span>
             <span className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 block">
-              ${sellerStats.totalRevenue.toLocaleString()}
+              ${displayStats.totalRevenue.toLocaleString()}
             </span>
             <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-0.5 mt-1">
-              <ArrowUpRight className="w-3 h-3" /> +{sellerStats.monthlyGrowth}% vs last mo.
+              <ArrowUpRight className="w-3 h-3" /> +{displayStats.monthlyGrowth}% vs last mo.
             </span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center">
@@ -108,10 +162,10 @@ export default function SellerDashboard() {
           <div>
             <span className="text-xs font-semibold text-slate-400 block">Total Orders</span>
             <span className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 block">
-              {sellerStats.totalOrders}
+              {displayStats.totalOrders}
             </span>
             <span className="text-[11px] font-semibold text-emerald-600 flex items-center gap-0.5 mt-1">
-              <ArrowUpRight className="w-3 h-3" /> +{sellerStats.orderGrowth}% increase
+              <ArrowUpRight className="w-3 h-3" /> +{displayStats.orderGrowth}% increase
             </span>
           </div>
           <div className="w-12 h-12 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center">
@@ -124,7 +178,7 @@ export default function SellerDashboard() {
           <div>
             <span className="text-xs font-semibold text-slate-400 block">Active Listings</span>
             <span className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 block">
-              {products.length}
+              {displayStats.activeListings}
             </span>
             <span className="text-[11px] text-slate-400 block mt-1">100% verified images</span>
           </div>
@@ -138,7 +192,7 @@ export default function SellerDashboard() {
           <div>
             <span className="text-xs font-semibold text-slate-400 block">Store Rating</span>
             <span className="text-xl sm:text-2xl font-black text-slate-900 mt-0.5 block">
-              {sellerStats.averageRating} ★
+              {displayStats.averageRating} ★
             </span>
             <span className="text-[11px] text-indigo-600 font-semibold block mt-1">
               Based on 1.2k customer reviews
@@ -320,19 +374,61 @@ export default function SellerDashboard() {
                         ${p.price.toFixed(2)}
                       </td>
 
-                      {/* Stock Status */}
+                      {/* Stock Status with Quick Edit */}
                       <td className="py-3 px-4">
-                        <span
-                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
-                            p.stock > 10
-                              ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                              : p.stock > 0
-                              ? 'bg-amber-50 text-amber-700 border border-amber-200'
-                              : 'bg-rose-50 text-rose-700 border border-rose-200'
-                          }`}
-                        >
-                          {p.stock > 0 ? `${p.stock} in stock` : 'Out of stock'}
-                        </span>
+                        {stockEditingId === p.id ? (
+                          <div className="flex items-center gap-1">
+                            <input
+                              type="number"
+                              min="0"
+                              value={stockInputVal}
+                              onChange={(e) => setStockInputVal(e.target.value)}
+                              className="w-16 px-1.5 py-0.5 rounded border border-indigo-400 text-xs font-bold text-slate-800 outline-none"
+                              autoFocus
+                            />
+                            <button
+                              onClick={() => handleStockSave(p)}
+                              className="p-1 bg-emerald-600 text-white rounded hover:bg-emerald-700 cursor-pointer"
+                              title="Save Stock"
+                            >
+                              <Check className="w-3 h-3" />
+                            </button>
+                            <button
+                              onClick={() => {
+                                setStockEditingId(null);
+                                setStockInputVal('');
+                              }}
+                              className="p-1 bg-slate-200 text-slate-700 rounded hover:bg-slate-300 cursor-pointer"
+                              title="Cancel"
+                            >
+                              <X className="w-3 h-3" />
+                            </button>
+                          </div>
+                        ) : (
+                          <div className="flex items-center gap-1.5 group">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                                p.stock > 10
+                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
+                                  : p.stock > 0
+                                  ? 'bg-amber-50 text-amber-700 border border-amber-200'
+                                  : 'bg-rose-50 text-rose-700 border border-rose-200'
+                              }`}
+                            >
+                              {p.stock > 0 ? `${p.stock} in stock` : 'Out of stock'}
+                            </span>
+                            <button
+                              onClick={() => {
+                                setStockEditingId(p.id);
+                                setStockInputVal(String(p.stock));
+                              }}
+                              className="opacity-0 group-hover:opacity-100 p-1 text-slate-400 hover:text-indigo-600 rounded transition-opacity cursor-pointer"
+                              title="Quick Edit Stock"
+                            >
+                              <Edit2 className="w-3 h-3" />
+                            </button>
+                          </div>
+                        )}
                       </td>
 
                       {/* Multi-images count */}

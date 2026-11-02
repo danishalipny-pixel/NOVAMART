@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { categories } from '../../data/categories';
 import { PRODUCT_ASSETS } from '../../constants/imageAssets';
+import { mediaApi } from '../../services/api';
 
 export default function ProductUploadModal({ isOpen, onClose, editingProduct = null }) {
   const { saveProduct, addToast } = useStore();
@@ -101,6 +102,7 @@ export default function ProductUploadModal({ isOpen, onClose, editingProduct = n
       validNewImages.push({
         id: `img-${Date.now()}-${Math.random()}`,
         url: objectUrl,
+        file,
         name: file.name,
         size: sizeStr,
         isPrimary: false,
@@ -148,6 +150,7 @@ export default function ProductUploadModal({ isOpen, onClose, editingProduct = n
       copy[targetIdx] = {
         ...copy[targetIdx],
         url: objectUrl,
+        file,
         name: file.name,
         size: sizeStr
       };
@@ -207,10 +210,36 @@ export default function ProductUploadModal({ isOpen, onClose, editingProduct = n
     }, 250);
   };
 
-  const finishSubmit = () => {
+  const finishSubmit = async () => {
+    let currentImageList = [...imageList];
+
+    // If any images are fresh files and user is authenticated, stream upload to Cloudinary
+    const filesToUpload = currentImageList.filter((img) => img.file);
+    if (filesToUpload.length > 0 && localStorage.getItem('novamart_token')) {
+      try {
+        const formDataPayload = new FormData();
+        filesToUpload.forEach((item) => formDataPayload.append('images', item.file));
+        const uploadRes = await mediaApi.uploadImages(formDataPayload);
+        if (uploadRes?.data && Array.isArray(uploadRes.data)) {
+          let uIdx = 0;
+          currentImageList = currentImageList.map((img) => {
+            if (img.file && uploadRes.data[uIdx]) {
+              const uploadedUrl = uploadRes.data[uIdx].secureUrl || uploadRes.data[uIdx].url;
+              uIdx++;
+              return { ...img, url: uploadedUrl, file: null };
+            }
+            return img;
+          });
+        }
+      } catch (uploadErr) {
+        // Fall back gracefully to preview URL so user is never blocked
+        console.warn('Backend media upload fallback:', uploadErr.message);
+      }
+    }
+
     // Reorder images so primary image is first
-    const primary = imageList.find((img) => img.isPrimary) || imageList[0];
-    const rest = imageList.filter((img) => img !== primary);
+    const primary = currentImageList.find((img) => img.isPrimary) || currentImageList[0];
+    const rest = currentImageList.filter((img) => img !== primary);
     const orderedUrls = [primary.url, ...rest.map((r) => r.url)];
 
     const productPayload = {

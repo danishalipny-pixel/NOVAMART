@@ -1,0 +1,42 @@
+{
+  "name": "novamart-backend",
+  "version": "1.0.0",
+  "description": "Enterprise modular REST API backend and database foundation for NOVAMART platform",
+  "main": "src/server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node src/server.js",
+    "dev": "node --watch src/server.js",
+    "test:models": "node tests/testModels.js",
+    "test:health": "node tests/testHealth.js",
+    "test:auth": "node tests/testAuth.js",
+    "test:catalog": "node tests/testCatalogOrders.js",
+    "test:payment": "node tests/testPaymentMedia.js",
+    "test:profile": "node tests/testProfileReviewWishlist.js",
+    "test:seller-admin": "node tests/testSellerAdmin.js",
+    "test:production": "node tests/testProductionReadiness.js",
+    "test": "npm run test:models && npm run test:health && npm run test:auth && npm run test:catalog && npm run test:payment && npm run test:profile && npm run test:seller-admin && npm run test:production"
+  },
+  "keywords": [
+    "novamart",
+    "ecommerce",
+    "express",
+    "mongodb",
+    "mongoose",
+    "rest-api"
+  ],
+  "author": "NOVAMART Engineering Team",
+  "license": "MIT",
+  "dependencies": {
+    "bcrypt": "^5.1.1",
+    "cloudinary": "^2.11.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "express-validator": "^7.2.1",
+    "jsonwebtoken": "^9.0.2",
+    "mongoose": "^8.9.5",
+    "multer": "^2.5.0",
+    "stripe": "^23.1.0"
+  }
+}

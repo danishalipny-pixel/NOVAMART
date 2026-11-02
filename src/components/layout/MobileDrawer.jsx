@@ -1,7 +1,8 @@
 import React from 'react';
 import { useStore } from '../../context/StoreContext';
+import { useAuth } from '../../context/AuthContext';
 import { categories } from '../../data/categories';
-import { X, Store, ShoppingBag, ShieldCheck, ChevronRight } from 'lucide-react';
+import { X, Store, ShoppingBag, ShieldCheck, ChevronRight, User, LogOut } from 'lucide-react';
 import SafeImage from '../common/SafeImage';
 
 export default function MobileDrawer() {
@@ -11,10 +12,41 @@ export default function MobileDrawer() {
     selectedCategory,
     setSelectedCategory,
     activeView,
-    setActiveView
+    setActiveView,
+    addToast
   } = useStore();
 
+  const {
+    user,
+    isAuthenticated,
+    isSeller,
+    openAuthModal,
+    logout
+  } = useAuth();
+
   if (!isMobileNavOpen) return null;
+
+  const handleSellerAccess = () => {
+    setIsMobileNavOpen(false);
+    if (activeView === 'seller') {
+      setActiveView('storefront');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      addToast('Please sign in to access the Seller Dashboard', 'info');
+      openAuthModal('login');
+      return;
+    }
+
+    if (!isSeller) {
+      addToast('Activate your seller account to access the dashboard', 'info');
+      openAuthModal('become-seller');
+      return;
+    }
+
+    setActiveView('seller');
+  };
 
   return (
     <div className="fixed inset-0 z-50 lg:hidden overflow-hidden">
@@ -45,13 +77,56 @@ export default function MobileDrawer() {
           </button>
         </div>
 
+        {/* User Account Bar in Mobile Drawer */}
+        <div className="p-3 bg-slate-50 border-b border-slate-200/60">
+          {!isAuthenticated ? (
+            <button
+              onClick={() => {
+                setIsMobileNavOpen(false);
+                openAuthModal('login');
+              }}
+              className="w-full flex items-center justify-between p-2.5 bg-white rounded-xl border border-slate-200 shadow-xs text-xs font-bold text-slate-700 cursor-pointer hover:border-indigo-300"
+            >
+              <span className="flex items-center gap-2">
+                <User className="w-4 h-4 text-indigo-600" />
+                Sign In or Register
+              </span>
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            </button>
+          ) : (
+            <div className="bg-white p-2.5 rounded-xl border border-slate-200 shadow-xs flex items-center justify-between">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-indigo-600 to-purple-600 text-white font-bold text-xs flex items-center justify-center shrink-0">
+                  {user.name ? user.name.charAt(0).toUpperCase() : 'U'}
+                </div>
+                <div className="min-w-0">
+                  <div className="text-xs font-bold text-slate-800 truncate">{user.name}</div>
+                  <span className="text-[10px] uppercase font-bold text-indigo-600">
+                    {user.role} Account
+                  </span>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  logout();
+                  setActiveView('storefront');
+                  setIsMobileNavOpen(false);
+                  addToast('Signed out successfully', 'info');
+                }}
+                className="p-1.5 text-rose-500 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                title="Sign Out"
+                aria-label="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </button>
+            </div>
+          )}
+        </div>
+
         {/* Quick Action Switcher */}
         <div className="p-3 bg-indigo-50/70 border-b border-indigo-100">
           <button
-            onClick={() => {
-              setActiveView(activeView === 'seller' ? 'storefront' : 'seller');
-              setIsMobileNavOpen(false);
-            }}
+            onClick={handleSellerAccess}
             className="w-full flex items-center justify-between p-2.5 bg-white rounded-xl border border-indigo-200/70 shadow-xs text-xs font-bold text-indigo-700 cursor-pointer"
           >
             <span className="flex items-center gap-2">
@@ -121,7 +196,7 @@ export default function MobileDrawer() {
             <span>Guaranteed High-Res Verified Items</span>
           </div>
           <div className="text-[11px] text-slate-400">
-            © 2026 NOVAMART Platform • Full Responsiveness Engine
+            © 2026 NOVAMART Platform • Verified Multi-Vendor Retail
           </div>
         </div>
       </div>

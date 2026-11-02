@@ -1,5 +1,6 @@
 import React from 'react';
 import { useStore } from '../../context/StoreContext';
+import { useAuth } from '../../context/AuthContext';
 import { Home, Layers, Heart, ShoppingCart, Store } from 'lucide-react';
 
 export default function MobileBottomNav() {
@@ -8,9 +9,38 @@ export default function MobileBottomNav() {
     setActiveView,
     setIsMobileNavOpen,
     setIsCartOpen,
+    setIsWishlistOpen,
     cartCount,
-    wishlist
+    wishlist,
+    addToast
   } = useStore();
+
+  const {
+    isAuthenticated,
+    isSeller,
+    openAuthModal
+  } = useAuth();
+
+  const handleSellerAccess = () => {
+    if (activeView === 'seller') {
+      setActiveView('storefront');
+      return;
+    }
+
+    if (!isAuthenticated) {
+      addToast('Please sign in to access the Seller Dashboard', 'info');
+      openAuthModal('login');
+      return;
+    }
+
+    if (!isSeller) {
+      addToast('Activate your seller account to access the dashboard', 'info');
+      openAuthModal('become-seller');
+      return;
+    }
+
+    setActiveView('seller');
+  };
 
   return (
     <div className="fixed bottom-0 inset-x-0 z-40 lg:hidden bg-white/95 backdrop-blur-md border-t border-slate-200/80 px-2 py-1.5 shadow-lg">
@@ -37,9 +67,7 @@ export default function MobileBottomNav() {
 
         {/* Wishlist */}
         <button
-          onClick={() => {
-            setActiveView('storefront');
-          }}
+          onClick={() => setIsWishlistOpen(true)}
           className="relative flex flex-col items-center justify-center p-1.5 rounded-lg text-[10px] font-medium text-slate-500 hover:text-slate-900 transition-colors"
         >
           <Heart className="w-5 h-5 mb-0.5" />
@@ -67,7 +95,7 @@ export default function MobileBottomNav() {
 
         {/* Seller Portal */}
         <button
-          onClick={() => setActiveView(activeView === 'seller' ? 'storefront' : 'seller')}
+          onClick={handleSellerAccess}
           className={`flex flex-col items-center justify-center p-1.5 rounded-lg text-[10px] font-medium transition-colors ${
             activeView === 'seller' ? 'text-indigo-600 font-bold' : 'text-slate-500 hover:text-slate-900'
           }`}
